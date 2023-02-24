@@ -1,6 +1,8 @@
 #ifndef Included_conf_h
 #define Included_conf_h
+#ifndef CONFIG
 #define CONFIG "/etc/mupe.conf"
+#endif
 
 struct config
 {
