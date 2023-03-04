@@ -4,9 +4,12 @@
 #include<sys/stat.h>
 #include<unistd.h>
 #include"conf.h"
+#ifndef CONFIG
+#define CONFIG "/etc/mupe.conf"
+#endif
 #define USER "/etc/passwd"
 #define GROUP "/etc/group"
-#define CACHE "/tmp/MicroPrivilageEscalator"
+#define CACHE "/tmp/MicroPrivilegeEscalator"
 
 char lscontain(const char *restrict haystack, const char *restrict needle)
 {
@@ -87,9 +90,12 @@ char permitted(const struct config *conf)
                         name[ind] = '\0';
                         fseek(fh, 0, SEEK_END);
                     }
-                    colon = 0;
-                    ind = 0;
-                    entryid = 0;
+                    else
+                    {
+                        colon = 0;
+                        ind = 0;
+                        entryid = 0;
+                    }
                     break;
                 default:
                     if(colon == 0)
@@ -165,11 +171,11 @@ long loadtime(const char *tty)
     FILE *fh;
     long t = 0;
     size_t len = strlen(tty);
-    if(len + 30 < sizeof(path))
+    if(len + 29 < sizeof(path))
     {
         strcpy(path, CACHE);
-        path[29] = '/';
-        strcpy(path + 30, tty);
+        path[28] = '/';
+        strcpy(path + 29, tty);
         fh = fopen(path, "r");
         if(fh != NULL)
         {
@@ -195,11 +201,11 @@ int savetime(const char *tty, long t)
         }
     }
     len = strlen(tty);
-    if(len + 30 < sizeof(path))
+    if(len + 29 < sizeof(path))
     {
         strcpy(path, CACHE);
-        path[29] = '/';
-        strcpy(path + 30, tty);
+        path[28] = '/';
+        strcpy(path + 29, tty);
         fh = fopen(path, "w");
         if(fh == NULL)
             succ = 1;
