@@ -2,12 +2,14 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<sys/wait.h>
 #include<time.h>
 #include<termios.h>
 #include<unistd.h>
 #include"conf.h"
 #define SECRET "/etc/shadow"
 #define ring putchar('\a')
+const char superuserhome[] = "/root";
 char verify(int fd, const char *user)
 {
     char cbuf[121], pass[121];
@@ -98,6 +100,7 @@ char verify(int fd, const char *user)
             }
         }
         tcsetattr(fd, TCSANOW, &old);
+        putchar('\n');
         cbuf[passind] = '\0';
         trypass = crypt(cbuf, pass);
         strcpy(cbuf, trypass);
@@ -109,7 +112,6 @@ int execmd(const char *cmd, char *const* args)
 {
     int pfd[2];
     int flag, pid;
-    int succ = 0;
     pipe(pfd);
     flag = fcntl(pfd[1], F_GETFD);
     flag |= FD_CLOEXEC;
@@ -120,17 +122,23 @@ int execmd(const char *cmd, char *const* args)
         close(pfd[1]);
         flag = read(pfd[1], &flag, sizeof flag);
         if(flag > 0)
-            succ = 1;
+            pid = 0;
         close(pfd[0]);
     }
     else
     {
         close(pfd[0]);
+        setreuid(0, 0);
+        setregid(0, 0);
+        setenv("HOME", superuserhome, 1);
+        setenv("LOGNAME", superuserhome + 1, 1);
+        setenv("USER", superuserhome + 1, 1);
         execvp(cmd, args);
         write(pfd[1], &flag, sizeof flag);
         close(pfd[1]);
         exit(1);
     }
+    return pid;
 }
 int main(int argl, char *argv[])
 {
@@ -138,11 +146,14 @@ int main(int argl, char *argv[])
     long timeout, curr = 0;
     char user[361], tty[361];
     char *ttybase;
-    char ask = 1, auth;
+    int pid, status;
+    char auth, ask = 1;
     int succ = 0;
     int ttyfd = 0;
     for(; ttyfd < 3 && !isatty(ttyfd); ++ttyfd);
-    if(ttyfd == 3)
+    if(argl == 1)
+        printf("%s version 1.0.0, Micro Privilege Escalator\n", *argv);
+    else if(ttyfd == 3)
     {
         fputs("Fatal error: No interactive terminal device found.\n", stderr);
         succ = 1;
@@ -180,7 +191,7 @@ int main(int argl, char *argv[])
                 auth = 1;
             if(auth)
             {
-                execmd(argv[1], argv + 1);
+                pid = execmd(argv[1], argv + 1);
                 if(conf.persist > 0)
                 {
                     succ = savetime(ttybase, timeout);
@@ -189,6 +200,10 @@ int main(int argl, char *argv[])
                     else if(succ == 13)
                         fputs("TTY name too long.\n", stderr);
                 }
+                if(pid == 0)
+                    perror("Could not execute commmand");
+                else
+                    waitpid(pid, &status, 0);
             }
             else
             {
