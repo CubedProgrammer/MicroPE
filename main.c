@@ -1,3 +1,4 @@
+#include<errno.h>
 #include<fcntl.h>
 #include<stdio.h>
 #include<stdlib.h>
@@ -10,6 +11,12 @@
 #define SECRET "/etc/shadow"
 #define ring putchar('\a')
 const char superuserhome[] = "/root";
+int fdgetc(int fd)
+{
+    char unsigned ch;
+    int cnt = read(fd, &ch, 1);
+    return cnt == 1 ? ch : -1;
+}
 char verify(int fd, const char *user)
 {
     char cbuf[121], pass[121];
@@ -55,11 +62,11 @@ char verify(int fd, const char *user)
         curr.c_lflag &= ~(ECHO | ICANON);
         tcsetattr(fd, TCSANOW, &curr);
         passind = ind = 0;
-        for(int ch = getchar(); ch != '\n'; ch = getchar())
+        for(int ch = fdgetc(fd); ch != '\n'; ch = fdgetc(fd))
         {
             if(ch == 033)
             {
-                ch = (getchar(), getchar());
+                ch = (fdgetc(fd), fdgetc(fd));
                 switch(ch)
                 {
                     case 0103:
@@ -112,6 +119,7 @@ int execmd(const char *cmd, char *const* args)
 {
     int pfd[2];
     int flag, pid;
+    int cnt;
     pipe(pfd);
     flag = fcntl(pfd[1], F_GETFD);
     flag |= FD_CLOEXEC;
@@ -120,9 +128,12 @@ int execmd(const char *cmd, char *const* args)
     if(pid > 0)
     {
         close(pfd[1]);
-        flag = read(pfd[1], &flag, sizeof flag);
-        if(flag > 0)
+        cnt = read(pfd[0], &flag, sizeof flag);
+        if(cnt > 0)
+        {
             pid = 0;
+            errno = flag;
+        }
         close(pfd[0]);
     }
     else
@@ -134,6 +145,7 @@ int execmd(const char *cmd, char *const* args)
         setenv("LOGNAME", superuserhome + 1, 1);
         setenv("USER", superuserhome + 1, 1);
         execvp(cmd, args);
+        flag = errno;
         write(pfd[1], &flag, sizeof flag);
         close(pfd[1]);
         exit(1);
@@ -152,7 +164,7 @@ int main(int argl, char *argv[])
     int ttyfd = 0;
     for(; ttyfd < 3 && !isatty(ttyfd); ++ttyfd);
     if(argl == 1)
-        printf("%s version 1.0.0, Micro Privilege Escalator\n", *argv);
+        printf("%s version 1.0.1, Micro Privilege Escalator\n", *argv);
     else if(ttyfd == 3)
     {
         fputs("Fatal error: No interactive terminal device found.\n", stderr);
@@ -168,9 +180,9 @@ int main(int argl, char *argv[])
             perror("Reading configuration failed");
         else if(permitted(&conf))
         {
+            ttyname_r(ttyfd, tty, sizeof tty);
             if(conf.persist > 0)
             {
-                ttyname_r(ttyfd, tty, sizeof tty);
                 ttybase = tty;
                 for(char *it = tty; *it != '\0'; ++it)
                 {
@@ -185,7 +197,17 @@ int main(int argl, char *argv[])
             {
                 timeout = curr + conf.persist;
                 printf("%s: password for %s: ", *argv, conf.user);
-                auth = verify(ttyfd, conf.user);
+                ttyfd = open(tty, O_RDONLY);
+                if(ttyfd == -1)
+                {
+                    fprintf(stderr, "Opening %s", tty);
+                    perror(" failed");
+                }
+                else
+                {
+                    auth = verify(ttyfd, conf.user);
+                    close(ttyfd);
+                }
             }
             else
                 auth = 1;
