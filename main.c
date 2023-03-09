@@ -19,6 +19,7 @@ int fdgetc(int fd)
 }
 char verify(int fd, const char *user)
 {
+    const char lf = '\n';
     char cbuf[121], pass[121];
     char loopuser[361];
     char *trypass;
@@ -36,7 +37,7 @@ char verify(int fd, const char *user)
             switch(ch)
             {
                 case'\n':
-                    loopuser[ind] = '\0';
+                    pass[passind] = loopuser[ind] = '\0';
                     if(strcmp(loopuser, user) == 0)
                         fseek(fh, 0, SEEK_END);
                     else
@@ -107,7 +108,7 @@ char verify(int fd, const char *user)
             }
         }
         tcsetattr(fd, TCSANOW, &old);
-        putchar('\n');
+        write(fd, &lf, 1);
         cbuf[passind] = '\0';
         trypass = crypt(cbuf, pass);
         strcpy(cbuf, trypass);
@@ -157,14 +158,16 @@ int main(int argl, char *argv[])
     struct config conf;
     long timeout, curr = 0;
     char user[361], tty[361];
-    char *ttybase;
+    char promptmsg[361];
+    char *ttybase, *promptptr;
     int pid, status;
+    size_t promptlen;
     char auth, ask = 1;
     int succ = 0;
     int ttyfd = 0;
     for(; ttyfd < 3 && !isatty(ttyfd); ++ttyfd);
     if(argl == 1)
-        printf("%s version 1.0.1, Micro Privilege Escalator\n", *argv);
+        printf("%s version 1.0.2, Micro Privilege Escalator\n", *argv);
     else if(ttyfd == 3)
     {
         fputs("Fatal error: No interactive terminal device found.\n", stderr);
@@ -196,8 +199,7 @@ int main(int argl, char *argv[])
             if(ask)
             {
                 timeout = curr + conf.persist;
-                printf("%s: password for %s: ", *argv, conf.user);
-                ttyfd = open(tty, O_RDONLY);
+                ttyfd = open(tty, O_RDWR);
                 if(ttyfd == -1)
                 {
                     fprintf(stderr, "Opening %s", tty);
@@ -205,6 +207,15 @@ int main(int argl, char *argv[])
                 }
                 else
                 {
+                    promptlen = snprintf(promptmsg, sizeof(promptmsg), "%s: password for %s: ", *argv, conf.user);
+                    if(promptlen >= sizeof promptmsg)
+                    {
+                        promptptr = malloc(promptlen + 1);
+                        snprintf(promptptr, promptlen + 1, "%s: password for %s: ", *argv, conf.user);
+                        write(ttyfd, promptptr, promptlen);
+                    }
+                    else
+                        write(ttyfd, promptmsg, promptlen);
                     auth = verify(ttyfd, conf.user);
                     close(ttyfd);
                 }
@@ -223,7 +234,11 @@ int main(int argl, char *argv[])
                         fputs("TTY name too long.\n", stderr);
                 }
                 if(pid == 0)
-                    perror("Could not execute commmand");
+                {
+                    fprintf(stderr, "Executing command %s", argv[1]);
+                    perror(" failed");
+                    fputs("Some commands are part of your shell and not executable programs.\n", stderr);
+                }
                 else
                     waitpid(pid, &status, 0);
             }
