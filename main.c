@@ -1,8 +1,10 @@
+#include<dirent.h>
 #include<errno.h>
 #include<fcntl.h>
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<sys/stat.h>
 #include<sys/wait.h>
 #include<time.h>
 #include<termios.h>
@@ -11,6 +13,58 @@
 #define SECRET "/etc/shadow"
 #define ring putchar('\a')
 const char superuserhome[] = "/root";
+unsigned controlling_tty(void)
+{
+    int ch;
+    const char l = '(';
+    const char r = ')';
+    unsigned space = 0, open = 0;
+    unsigned tty = 0;
+    FILE *fh = fopen("/proc/self/stat", "r");
+    while(space < 6)
+    {
+        ch = fgetc(fh);
+        if(open == 0 && ch == ' ')
+            ++space;
+        else if(ch == l)
+            ++open;
+        else if(ch == r)
+            --open;
+    }
+    fscanf(fh, "%u", &tty);
+    fclose(fh);
+    return tty;
+}
+int findtty(unsigned dev, char *buf, size_t bsz)
+{
+    size_t len;
+    struct stat fdat;
+    DIR *dh;
+    int succ = 1;
+    strcpy(buf, "/dev/");
+    for(int m = 2; m; --m)
+    {
+        len = strlen(buf);
+        dh = opendir(buf);
+        for(struct dirent *en = readdir(dh); m && en != NULL; en = readdir(dh))
+        {
+            if(en->d_type == DT_CHR)
+            {
+                for(unsigned i = len; (buf[i] = en->d_name[i - len]) != '\0' && i + 1 < bsz; ++i);
+                stat(buf, &fdat);
+                if(fdat.st_rdev == dev)
+                {
+                    m = 0;
+                    succ = 0;
+                }
+            }
+        }
+        if(m)
+            strcpy(buf, "/dev/pts/");
+        m += m == 0;
+    }
+    return succ;
+}
 int fdgetc(int fd)
 {
     char unsigned ch;
@@ -164,11 +218,10 @@ int main(int argl, char *argv[])
     size_t promptlen;
     char auth, ask = 1;
     int succ = 0;
-    int ttyfd = 0;
-    for(; ttyfd < 3 && !isatty(ttyfd); ++ttyfd);
+    int ttyfd = findtty(controlling_tty(), tty, sizeof tty);
     if(argl == 1)
         printf("%s version 1.0.2, Micro Privilege Escalator\n", *argv);
-    else if(ttyfd == 3)
+    else if(ttyfd)
     {
         fputs("Fatal error: No interactive terminal device found.\n", stderr);
         succ = 1;
@@ -183,7 +236,6 @@ int main(int argl, char *argv[])
             perror("Reading configuration failed");
         else if(permitted(&conf))
         {
-            ttyname_r(ttyfd, tty, sizeof tty);
             if(conf.persist > 0)
             {
                 ttybase = tty;
