@@ -210,6 +210,7 @@ int execmd(const char *cmd, char *const* args)
 int main(int argl, char *argv[])
 {
     struct config conf;
+    struct stat fdat;
     long timeout, curr = 0;
     char user[361], tty[361];
     char promptmsg[361];
@@ -220,7 +221,7 @@ int main(int argl, char *argv[])
     int succ = 0;
     int ttyfd = findtty(controlling_tty(), tty, sizeof tty);
     if(argl == 1)
-        printf("%s version 1.0.2, Micro Privilege Escalator\n", *argv);
+        printf("%s version 1.0.3, Micro Privilege Escalator\n", *argv);
     else if(ttyfd)
     {
         fputs("Fatal error: No interactive terminal device found.\n", stderr);
@@ -246,7 +247,8 @@ int main(int argl, char *argv[])
                 }
                 timeout = loadtime(ttybase);
                 curr = time(NULL);
-                ask = curr > timeout;
+                stat(tty, &fdat);
+                ask = curr > timeout || fdat.st_ctime + conf.persist > timeout;
             }
             if(ask)
             {

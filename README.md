@@ -53,9 +53,3 @@ Reading from the configuration file does not check for stack smashing, since onl
 
 Password buffer is overwritten with encrypted password.
 If encrypted password is longer, which it usually is, your password will be erased from memory.
-
-If a pseudo-terminal is closed, but a command was run on it and the persist timer is not zero, there may be an issue.
-A program can create a new pseudo-terminal, if it has the same name as the old pseudo-terminal, it can run commands.
-
-For example, suppose a command was run on /dev/pts/4, the persist timer is 240 seconds, and the terminal is closed.
-Before the time is up, a program can open a new terminal, if it happens to also become /dev/pts/4, it can run commands.
