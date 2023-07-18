@@ -24,6 +24,10 @@ The first line is the maximum number of seconds to allow a user to run commands 
 The second line is the user whose password is asked for, if it starts with $ then the environment variable is used instead.
 Use $USER so every user has to type their own password.
 
+Using an environmental varianle is deprecated, since those can easily be changed prior to running a process.
+
+Using a sole $ will ask for the password of the process' user.
+
 The third line is the list of users permitted, separated by commas and no spaces, names only, IDs not accepted.
 
 The fourth line is the list of groups permitted, if a user is in any group it will be permitted.

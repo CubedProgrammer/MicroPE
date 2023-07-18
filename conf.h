@@ -12,5 +12,6 @@ int loadconf(struct config *conf);
 char permitted(const struct config *conf);
 long loadtime(const char *tty);
 int savetime(const char *tty, long t);
+int getnamebyid(unsigned uid, char *name);
 
 #endif

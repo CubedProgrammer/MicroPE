@@ -50,12 +50,17 @@ int loadconf(struct config *conf)
         fscanf(fh, "%s", conf->gpermit);
         if(conf->user[0] == '$')
         {
-            userenv = getenv(conf->user + 1);
-            len = strlen(userenv);
-            if(len < sizeof(conf->user))
-                strcpy(conf->user, userenv);
+            if(conf->user[1] == '\0')
+                succ = getnamebyid(getuid(), conf->user) * -1;
             else
-                succ = 13;
+            {
+                userenv = getenv(conf->user + 1);
+                len = strlen(userenv);
+                if(len < sizeof(conf->user))
+                    strcpy(conf->user, userenv);
+                else
+                    succ = 13;
+            }
         }
         strls(conf->upermit);
         strls(conf->gpermit);
@@ -70,95 +75,57 @@ char permitted(const struct config *conf)
     FILE *fh;
     char perm = 0;
     size_t ind = 0;
-    unsigned uid = getuid();
-    fh = fopen(USER, "r");
-    if(fh == NULL)
-        perror("Could not read user information file");
+    unsigned colon = 0, uid = getuid();
+    if(getnamebyid(uid, name))
+        perror("Could not get user name");
     else
     {
-        unsigned colon = 0, entryid = 0;
-        for(int ch = fgetc(fh); ch > 0; ch = fgetc(fh))
+        perm = lscontain(conf->upermit, name);
+        if(!perm)
         {
-            switch(ch)
+            char group[361], member[361];
+            fh = fopen(GROUP, "r");
+            if(fh == NULL)
+                perror("Could not read group information");
+            else
             {
-                case':':
-                    ++colon;
-                    break;
-                case'\n':
-                    if(entryid == uid)
-                    {
-                        name[ind] = '\0';
-                        fseek(fh, 0, SEEK_END);
-                    }
-                    else
-                    {
-                        colon = 0;
-                        ind = 0;
-                        entryid = 0;
-                    }
-                    break;
-                default:
-                    if(colon == 0)
-                    {
-                        if(ind < 360)
-                            name[ind++] = ch;
-                    }
-                    else if(colon == 2)
-                        entryid = entryid * 10 + ch - '0';
-            }
-        }
-        fclose(fh);
-        if(ind == 0)
-            fputs("User does not exist.\n", stderr);
-        else
-        {
-            perm = lscontain(conf->upermit, name);
-            if(!perm)
-            {
-                char group[361], member[361];
-                fh = fopen(GROUP, "r");
-                if(fh == NULL)
-                    perror("Could not read group information");
-                else
+                for(int ch = fgetc(fh); !perm && ch > 0; ch = fgetc(fh))
                 {
-                    for(int ch = fgetc(fh); !perm && ch > 0; ch = fgetc(fh))
+                    switch(ch)
                     {
-                        switch(ch)
-                        {
-                            case',':
-                                if(colon == 3)
-                                {
-                                    member[ind] = '\0';
-                                    if(strcmp(member, name) == 0)
-                                        perm = lscontain(conf->gpermit, group);
-                                }
-                                break;
-                            case':':
-                                if(++colon == 1)
-                                    group[ind] = '\0';
-                                ind = 0;
-                                break;
-                            case'\n':
+                        case',':
+                            if(colon == 3)
+                            {
                                 member[ind] = '\0';
                                 if(strcmp(member, name) == 0)
                                     perm = lscontain(conf->gpermit, group);
-                                colon = 0;
-                                break;
-                            default:
-                                if(colon == 0)
-                                {
-                                    if(ind < 360)
-                                        group[ind++] = ch;
-                                }
-                                else if(colon == 3)
-                                {
-                                    if(ind < 360)
-                                        member[ind++] = ch;
-                                }
-                        }
+                            }
+                            break;
+                        case':':
+                            if(++colon == 1)
+                                group[ind] = '\0';
+                            ind = 0;
+                            break;
+                        case'\n':
+                            member[ind] = '\0';
+                            if(strcmp(member, name) == 0)
+                                perm = lscontain(conf->gpermit, group);
+                            colon = 0;
+                            break;
+                        default:
+                            if(colon == 0)
+                            {
+                                if(ind < 360)
+                                    group[ind++] = ch;
+                            }
+                            else if(colon == 3)
+                            {
+                                if(ind < 360)
+                                    member[ind++] = ch;
+                            }
                     }
-                    fclose(fh);
                 }
+                fclose(fh);
             }
         }
     }
@@ -217,5 +184,49 @@ int savetime(const char *tty, long t)
     }
     else
         succ = 13;
+    return succ;
+}
+
+int getnamebyid(unsigned uid, char *name)
+{
+    int succ = 0;
+    size_t ind = 0;
+    unsigned colon = 0, entryid = 0;
+    FILE *fh = fopen(USER, "r");
+    if(fh == NULL)
+        succ = -1;
+    else
+    {
+        for(int ch = fgetc(fh); ch > 0; ch = fgetc(fh))
+        {
+            switch(ch)
+            {
+                case':':
+                    ++colon;
+                    break;
+                case'\n':
+                    if(entryid == uid)
+                    {
+                        name[ind] = '\0';
+                        fseek(fh, 0, SEEK_END);
+                    }
+                    else
+                    {
+                        colon = 0;
+                        ind = 0;
+                        entryid = 0;
+                    }
+                    break;
+                default:
+                    if(colon == 0)
+                    {
+                        if(ind < 360)
+                            name[ind++] = ch;
+                    }
+                    else if(colon == 2)
+                        entryid = entryid * 10 + ch - '0';
+            }
+        }
+    }
     return succ;
 }
