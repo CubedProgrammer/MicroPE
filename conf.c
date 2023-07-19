@@ -222,11 +222,18 @@ int getnamebyid(unsigned uid, char *name)
                     {
                         if(ind < 360)
                             name[ind++] = ch;
+                        else
+                            succ = -2;
                     }
                     else if(colon == 2)
                         entryid = entryid * 10 + ch - '0';
             }
         }
+    }
+    if(succ == -2)
+    {
+        ++succ;
+        fputs("Username is too long.\n", stderr);
     }
     return succ;
 }

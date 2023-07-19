@@ -221,7 +221,7 @@ int main(int argl, char *argv[])
     int succ = 0;
     int ttyfd = findtty(controlling_tty(), tty, sizeof tty);
     if(argl == 1)
-        printf("%s version 1.0.3, Micro Privilege Escalator\n", *argv);
+        printf("%s version 1.0.4, Micro Privilege Escalator\n", *argv);
     else if(ttyfd)
     {
         fputs("Fatal error: No interactive terminal device found.\n", stderr);
