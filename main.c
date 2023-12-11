@@ -61,6 +61,7 @@ int findtty(unsigned dev, char *buf, size_t bsz)
         }
         if(m)
             strcpy(buf, "/dev/pts/");
+        closedir(dh);
         m += m == 0;
     }
     return succ;
@@ -117,13 +118,23 @@ char verify(int fd, const char *user)
         curr.c_lflag &= ~(ECHO | ICANON);
         tcsetattr(fd, TCSANOW, &curr);
         passind = ind = 0;
-        for(int ch = fdgetc(fd); ch != '\n'; ch = fdgetc(fd))
+        for(int ch = fdgetc(fd); ch != '\n' && ch != '\r'; ch = fdgetc(fd))
         {
             if(ch == 033)
             {
                 ch = (fdgetc(fd), fdgetc(fd));
                 switch(ch)
                 {
+                    case 063:
+                        ch = fdgetc(fd);
+                        if(ch == 0176)
+                        {
+                            if(ind == passind)
+                                ring;
+                            else if(ind < --passind)
+                                memmove(cbuf + ind, cbuf + ind + 1, passind - ind);
+                        }
+                        break;
                     case 0103:
                         if(ind < passind)
                             ++ind;
@@ -221,7 +232,7 @@ int main(int argl, char *argv[])
     int succ = 0;
     int ttyfd = findtty(controlling_tty(), tty, sizeof tty);
     if(argl == 1)
-        printf("%s version 1.0.4, Micro Privilege Escalator\n", *argv);
+        printf("%s version 1.0.5, Micro Privilege Escalator\n", *argv);
     else if(ttyfd)
     {
         fputs("Fatal error: No interactive terminal device found.\n", stderr);
