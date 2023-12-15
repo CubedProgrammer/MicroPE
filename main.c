@@ -72,11 +72,11 @@ int fdgetc(int fd)
     int cnt = read(fd, &ch, 1);
     return cnt == 1 ? ch : -1;
 }
-char verify(int fd, const char *user)
+char verify(int fd, const char *user, char stars)
 {
     const char lf = '\n';
     char cbuf[121], pass[121];
-    char loopuser[361];
+    char loopuser[361], starbuf[121];
     char *trypass;
     struct termios old, curr;
     char succ = 0;
@@ -118,8 +118,14 @@ char verify(int fd, const char *user)
         curr.c_lflag &= ~(ECHO | ICANON);
         tcsetattr(fd, TCSANOW, &curr);
         passind = ind = 0;
+        memset(starbuf, '*', sizeof starbuf);
         for(int ch = fdgetc(fd); ch != '\n' && ch != '\r'; ch = fdgetc(fd))
         {
+            if(stars)
+            {
+                if(ind != 0)
+                    dprintf(fd, "\033\133%uD", ind);
+            }
             if(ch == 033)
             {
                 ch = (fdgetc(fd), fdgetc(fd));
@@ -170,6 +176,13 @@ char verify(int fd, const char *user)
                     memmove(cbuf + ind + 1, cbuf + ind, passind - ind);
                 cbuf[ind++] = ch;
                 ++passind;
+            }
+            if(stars)
+            {
+                starbuf[passind] = ' ';
+                write(fd, starbuf, passind + 1);
+                starbuf[passind] = '*';
+                dprintf(fd, "\033\133%uD", passind - ind + 1);
             }
         }
         tcsetattr(fd, TCSANOW, &old);
@@ -232,7 +245,7 @@ int main(int argl, char *argv[])
     int succ = 0;
     int ttyfd = findtty(controlling_tty(), tty, sizeof tty);
     if(argl == 1)
-        printf("%s version 1.0.5, Micro Privilege Escalator\n", *argv);
+        printf("%s version 1.1, Micro Privilege Escalator\n", *argv);
     else if(ttyfd)
     {
         fputs("Fatal error: No interactive terminal device found.\n", stderr);
@@ -281,7 +294,7 @@ int main(int argl, char *argv[])
                     }
                     else
                         write(ttyfd, promptmsg, promptlen);
-                    auth = verify(ttyfd, conf.user);
+                    auth = verify(ttyfd, conf.user, conf.stars);
                     close(ttyfd);
                 }
             }

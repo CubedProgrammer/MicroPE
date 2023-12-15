@@ -48,6 +48,7 @@ int loadconf(struct config *conf)
         fscanf(fh, "%s", conf->user);
         fscanf(fh, "%s", conf->upermit);
         fscanf(fh, "%s", conf->gpermit);
+        fscanf(fh, "%d", &conf->stars);
         if(conf->user[0] == '$')
         {
             if(conf->user[1] == '\0')

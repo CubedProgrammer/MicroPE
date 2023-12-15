@@ -6,6 +6,7 @@ struct config
     long persist;
     char user[361];
     char upermit[2601], gpermit[2601];
+    int stars;
 };
 
 int loadconf(struct config *conf);

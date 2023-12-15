@@ -16,6 +16,7 @@ The file /etc/mupe.conf has the following format.
 %s
 %s
 %s
+%d
 ```
 The file will be read using fscanf accordingly.
 
@@ -31,6 +32,8 @@ Using a sole $ will ask for the password of the process' user.
 The third line is the list of users permitted, separated by commas and no spaces, names only, IDs not accepted.
 
 The fourth line is the list of groups permitted, if a user is in any group it will be permitted.
+
+The fifth line is either 0 or 1, indicating to show stars or not when the password is being typed.
 ## Compilation
 Open your terminal in the base directory of this repository.
 ```
@@ -50,6 +53,7 @@ The default mupe.conf is probably not what you are looking for, this will emulat
 $USER
 "Your Username"
 sudo,wheel
+0
 ```
 Replace third line with whatever your username is, without any quotes.
 ## Security
